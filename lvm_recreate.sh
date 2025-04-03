@@ -89,8 +89,25 @@ format_fs lv_var /var
 format_fs lv_var_log /var/log
 format_fs lv_var_log_audit /var/log/audit
 format_fs lv_home /home
-format_fs lv_tmp /tmp
-format_fs lv_opt /opt
+
+# Ensure the new /home volume is mounted temporarily for data transfer
+mkdir -p /mnt/lv_home
+mount /dev/$VG_NAME/lv_home /mnt/lv_home
+
+# Preserve old /home content, including hidden files like .ssh
+echo "Copying existing /home content..."
+rsync -avxH --progress --stats /home/ /mnt/lv_home/
+
+# Ensure the ec2-user directory and SSH keys are copied
+mkdir -p /mnt/lv_home/ec2-user
+rsync -avxH --progress --stats /home/ec2-user/ /mnt/lv_home/ec2-user/
+chown -R ec2-user:ec2-user /mnt/lv_home/ec2-user
+chmod 700 /mnt/lv_home/ec2-user/.ssh
+chmod 600 /mnt/lv_home/ec2-user/.ssh/authorized_keys
+
+# Unmount the temporary mount and mount it properly as /home
+umount /mnt/lv_home
+mount /dev/$VG_NAME/lv_home /home
 
 # Handle swap separately
 if ! swapon --show | grep -q "/dev/$VG_NAME/lv_swap"; then
